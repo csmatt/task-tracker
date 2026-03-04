@@ -172,6 +172,10 @@ function createTimerCard(timer) {
         <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.52"/></svg>
         Reset
       </button>
+      <button class="ctrl-btn copy" data-action="copy" title="Copy as fractional hours">
+        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy
+      </button>
     </div>
   `;
 
@@ -189,6 +193,7 @@ function createTimerCard(timer) {
     else if (action === 'pause') pauseTimer(id);
     else if (action === 'reset') resetTimer(id);
     else if (action === 'delete') deleteTimer(id);
+    else if (action === 'copy') copyFractionalHours(id, btn);
   });
 
   return card;
@@ -247,6 +252,23 @@ function startInlineEdit(card, id) {
       input.value = timer.name;
       input.blur();
     }
+  });
+}
+
+function copyFractionalHours(id, btn) {
+  const timer = timers.find(t => t.id === id);
+  if (!timer) return;
+  const elapsed = getLiveElapsed(timer);
+  const fractional = (elapsed / 3600000).toFixed(1); // ms → hours, 1 decimal place
+  navigator.clipboard.writeText(fractional).then(() => {
+    // Flash feedback on button
+    const original = btn.innerHTML;
+    btn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" style="stroke:currentColor;fill:none;stroke-width:2.5"/></svg> Copied!`;
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.innerHTML = original;
+      btn.classList.remove('copied');
+    }, 1500);
   });
 }
 

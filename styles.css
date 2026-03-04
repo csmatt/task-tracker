@@ -446,6 +446,22 @@ h1 {
     background: var(--surface);
 }
 
+.ctrl-btn.copy {
+    color: var(--accent);
+    border-color: rgba(124, 106, 247, 0.3);
+}
+
+.ctrl-btn.copy:hover {
+    background: rgba(124, 106, 247, 0.1);
+    border-color: rgba(124, 106, 247, 0.5);
+}
+
+.ctrl-btn.copied {
+    color: var(--success) !important;
+    border-color: rgba(106, 247, 168, 0.4) !important;
+    background: rgba(106, 247, 168, 0.08) !important;
+}
+
 /* Fill SVG for play/pause icons */
 .ctrl-btn .icon-filled {
     fill: currentColor;
