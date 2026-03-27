@@ -4,9 +4,9 @@ const theme = isDark ? 'dark' : 'light';
 
 chrome.action.setIcon({
   path: {
-    "16": `icon-${theme}-16.png`,
-    "48": `icon-${theme}-48.png`,
-    "128": `icon-${theme}-128.png`
+    "16": `assets/icon-${theme}-16.png`,
+    "48": `assets/icon-${theme}-48.png`,
+    "128": `assets/icon-${theme}-128.png`
   }
 });
 

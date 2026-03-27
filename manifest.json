@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Task Tracker",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "Track time on tasks",
   "permissions": [
     "storage",
@@ -10,17 +10,17 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icon-light-16.png",
-      "48": "icon-light-48.png",
-      "128": "icon-light-128.png"
+      "16": "assets/icon-light-16.png",
+      "48": "assets/icon-light-48.png",
+      "128": "assets/icon-light-128.png"
     }
   },
   "background": {
     "service_worker": "background.js"
   },
   "icons": {
-    "16": "icon-light-16.png",
-    "48": "icon-light-48.png",
-    "128": "icon-light-128.png"
+    "16": "assets/icon-light-16.png",
+    "48": "assets/icon-light-48.png",
+    "128": "assets/icon-light-128.png"
   }
 }
