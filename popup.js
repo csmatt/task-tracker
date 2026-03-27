@@ -16,6 +16,7 @@ let timers = [];
 let displayInterval = null;
 let searchQuery = "";
 let activeTag = null;
+let undoStack = [];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,27 @@ function formatTime(ms) {
   const s = totalSec % 60;
   const pad = (n) => String(n).padStart(2, "0");
   return { h: pad(h), m: pad(m), s: pad(s) };
+}
+
+// ── Undo ─────────────────────────────────────────────────────────────────────
+
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(timers)));
+  if (undoStack.length > 20) undoStack.shift();
+  updateUndoBtn();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  timers = undoStack.pop();
+  saveTimers();
+  renderTimers();
+  updateUndoBtn();
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById("undoBtn");
+  if (btn) btn.disabled = undoStack.length === 0;
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -78,6 +100,7 @@ function pauseTimer(id) {
 }
 
 function resetTimer(id) {
+  pushUndo();
   timers = timers.map((t) =>
     t.id === id
       ? { ...t, running: false, elapsed: 0, lastTick: Date.now() }
@@ -88,19 +111,21 @@ function resetTimer(id) {
 }
 
 function deleteTimer(id) {
+  pushUndo();
   timers = timers.filter((t) => t.id !== id);
   saveTimers();
   renderTimers();
 }
 
 function renameTimer(id, newName) {
+  pushUndo();
   const name = newName.trim() || "Timer";
   timers = timers.map((t) => (t.id === id ? { ...t, name } : t));
   saveTimers();
 }
 
 function updateTimerElapsed(id, hours, minutes) {
-  // Validate and clamp values
+  pushUndo();
   const h = Math.max(0, Math.min(24, parseInt(hours, 10) || 0));
   const m = Math.max(0, Math.min(59, parseInt(minutes, 10) || 0));
   const newElapsed = (h * 3600 + m * 60) * 1000;
@@ -116,6 +141,7 @@ function updateTimerElapsed(id, hours, minutes) {
 }
 
 function addTimer(name) {
+  pushUndo();
   const now = Date.now();
   const timer = {
     id: generateId(),
@@ -132,6 +158,7 @@ function addTimer(name) {
 }
 
 function addTag(id, tag) {
+  pushUndo();
   const trimmed = tag.trim().toLowerCase();
   if (!trimmed) return;
   timers = timers.map((t) => {
@@ -145,6 +172,7 @@ function addTag(id, tag) {
 }
 
 function removeTag(id, tag) {
+  pushUndo();
   timers = timers.map((t) => {
     if (t.id === id) {
       return { ...t, tags: (t.tags || []).filter((tg) => tg !== tag) };
@@ -612,7 +640,11 @@ function startStorageSync() {
 // ── Event listeners ───────────────────────────────────────────────────────────
 
 document.getElementById("resetAllBtn").addEventListener("click", () => {
-  timers.forEach((timer) => resetTimer(timer.id));
+  pushUndo();
+  const now = Date.now();
+  timers = timers.map((t) => ({ ...t, running: false, elapsed: 0, lastTick: now }));
+  saveTimers();
+  renderTimers();
 });
 
 document.getElementById("addBtn").addEventListener("click", () => {
@@ -644,10 +676,24 @@ document.getElementById("searchInput").addEventListener("input", (e) => {
   renderTimers();
 });
 
+document.getElementById("undoBtn").addEventListener("click", undo);
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+    if (!isTyping) {
+      e.preventDefault();
+      undo();
+    }
+  }
+});
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 loadTimers(() => {
   renderTimers();
   startDisplayLoop();
   startStorageSync();
+  updateUndoBtn();
 });

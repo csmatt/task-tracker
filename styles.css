@@ -108,6 +108,12 @@ h1 {
   box-shadow: 0 0 12px var(--accent-glow);
 }
 
+.global-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  pointer-events: none;
+}
+
 .global-btn svg {
   width: 13px;
   height: 13px;
