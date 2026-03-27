@@ -223,7 +223,7 @@ function renderTimers() {
   const empty = document.getElementById("emptyState");
 
   if (timers.length === 0) {
-    list.innerHTML = "";
+    [...list.querySelectorAll(".timer-card")].forEach((c) => c.remove());
     list.appendChild(empty);
     empty.style.display = "block";
     updateTotalTime();
@@ -237,26 +237,29 @@ function renderTimers() {
   const sorted = [...timers].sort(
     (a, b) => (b.lastUsed || 0) - (a.lastUsed || 0),
   );
-  const filtered = sorted.filter((t) => {
-    if (search && !t.name.toLowerCase().includes(search)) return false;
-    if (activeTag && !(t.tags || []).includes(activeTag)) return false;
-    return true;
-  });
-  const filteredIds = new Set(filtered.map((t) => t.id));
 
-  // Remove cards that no longer pass the filter
+  const allTimerIds = new Set(timers.map((t) => t.id));
+
+  // Remove cards for deleted timers only
   [...list.querySelectorAll(".timer-card")].forEach((card) => {
-    if (!filteredIds.has(card.dataset.id)) card.remove();
+    if (!allTimerIds.has(card.dataset.id)) card.remove();
   });
 
-  // Create / update / reorder — appendChild moves existing nodes to maintain sort
-  filtered.forEach((timer) => {
+  // Create / update — use CSS order instead of DOM movement to avoid repaints
+  sorted.forEach((timer, index) => {
     let card = list.querySelector(`[data-id="${timer.id}"]`);
     if (!card) {
       card = createTimerCard(timer);
+      list.appendChild(card);
     }
+    card.style.order = index;
+
+    const visible =
+      (!search || timer.name.toLowerCase().includes(search)) &&
+      (!activeTag || (timer.tags || []).includes(activeTag));
+    card.style.display = visible ? "" : "none";
+
     updateTimerCard(card, timer);
-    list.appendChild(card);
   });
 
   updateTotalTime();
