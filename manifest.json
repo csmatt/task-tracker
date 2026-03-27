@@ -3,21 +3,24 @@
   "name": "Task Tracker",
   "version": "1.0.1",
   "description": "Track time on tasks",
-  "permissions": ["storage", "alarms"],
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icon16.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
+      "16": "icon-light-16.png",
+      "48": "icon-light-48.png",
+      "128": "icon-light-128.png"
     }
   },
   "background": {
     "service_worker": "background.js"
   },
   "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
+    "16": "icon-light-16.png",
+    "48": "icon-light-48.png",
+    "128": "icon-light-128.png"
   }
 }

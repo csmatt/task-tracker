@@ -262,15 +262,16 @@ h1 {
 }
 
 .timer-card.running {
-  border-color: rgba(106, 247, 168, 0.3);
-  box-shadow: 0 0 16px rgba(106, 247, 168, 0.06);
+  border-color: rgba(106, 247, 168, 0.55);
+  box-shadow: 0 0 24px rgba(106, 247, 168, 0.13), 0 0 0 1px rgba(106, 247, 168, 0.08);
+  background: linear-gradient(160deg, var(--surface) 0%, rgba(106, 247, 168, 0.05) 100%);
 }
 
 .timer-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .timer-name-wrap {
@@ -544,4 +545,190 @@ h1 {
 .ctrl-btn .icon-filled {
   fill: currentColor;
   stroke: none;
+}
+
+/* ── Top bar (total time + search) ───────────────────────────────────────── */
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 1;
+}
+
+.total-time {
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.total-time::before {
+  content: "∑ ";
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.search-input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+/* ── Tag filter bar ──────────────────────────────────────────────────────── */
+
+.tag-filter-bar {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: relative;
+  z-index: 1;
+}
+
+.tag-filter-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tag-filter-btn {
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.tag-filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tag-filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ── Timer top-right actions ─────────────────────────────────────────────── */
+
+.timer-top-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tag-add-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.timer-card:hover .tag-add-btn {
+  opacity: 1;
+}
+
+.tag-add-btn:hover {
+  color: var(--accent);
+  background: rgba(124, 106, 247, 0.1);
+}
+
+.tag-add-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+/* ── Timer tags row ──────────────────────────────────────────────────────── */
+
+.timer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(124, 106, 247, 0.1);
+  border: 1px solid rgba(124, 106, 247, 0.25);
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 2px 6px 2px 8px;
+  font-size: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 500;
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 1px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.tag-input {
+  background: var(--surface2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: "DM Sans", sans-serif;
+  outline: none;
+  width: 72px;
 }

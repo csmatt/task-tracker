@@ -1,7 +1,21 @@
+// Theme logic
+const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const theme = isDark ? 'dark' : 'light';
+
+chrome.action.setIcon({
+  path: {
+    "16": `icon-${theme}-16.png`,
+    "48": `icon-${theme}-48.png`,
+    "128": `icon-${theme}-128.png`
+  }
+});
+
 // popup.js — Timer UI logic
 
 let timers = [];
 let displayInterval = null;
+let searchQuery = "";
+let activeTag = null;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +51,7 @@ function startTimer(id) {
   const now = Date.now();
   timers = timers.map((t) => {
     if (t.id === id) {
-      return { ...t, running: true, lastTick: now };
+      return { ...t, running: true, lastTick: now, lastUsed: now };
     }
     // Pause all others
     if (t.running) {
@@ -89,16 +103,11 @@ function updateTimerElapsed(id, hours, minutes) {
   // Validate and clamp values
   const h = Math.max(0, Math.min(24, parseInt(hours, 10) || 0));
   const m = Math.max(0, Math.min(59, parseInt(minutes, 10) || 0));
-  const newElapsed = (h * 3600 + m * 60) * 1000; // Convert to milliseconds, seconds = 0
+  const newElapsed = (h * 3600 + m * 60) * 1000;
 
   timers = timers.map((t) => {
     if (t.id === id) {
-      // Stop the timer if it's running
-      return {
-        ...t,
-        elapsed: newElapsed,
-        lastTick: Date.now(),
-      };
+      return { ...t, elapsed: newElapsed, lastTick: Date.now() };
     }
     return t;
   });
@@ -107,23 +116,104 @@ function updateTimerElapsed(id, hours, minutes) {
 }
 
 function addTimer(name) {
+  const now = Date.now();
   const timer = {
     id: generateId(),
     name: name.trim() || "Timer",
     elapsed: 0,
     running: false,
-    lastTick: Date.now(),
+    lastTick: now,
+    lastUsed: now,
+    tags: [],
   };
-  timers.push(timer);
+  timers.unshift(timer);
   saveTimers();
   renderTimers();
 }
 
-// ── Live elapsed for running timers (local calc, no storage writes) ───────────
+function addTag(id, tag) {
+  const trimmed = tag.trim().toLowerCase();
+  if (!trimmed) return;
+  timers = timers.map((t) => {
+    if (t.id === id && !(t.tags || []).includes(trimmed)) {
+      return { ...t, tags: [...(t.tags || []), trimmed] };
+    }
+    return t;
+  });
+  saveTimers();
+  renderTimers();
+}
+
+function removeTag(id, tag) {
+  timers = timers.map((t) => {
+    if (t.id === id) {
+      return { ...t, tags: (t.tags || []).filter((tg) => tg !== tag) };
+    }
+    return t;
+  });
+  // If active tag was removed, clear filter if no timers have it anymore
+  if (activeTag === tag && !timers.some((t) => (t.tags || []).includes(tag))) {
+    activeTag = null;
+  }
+  saveTimers();
+  renderTimers();
+}
+
+// ── Live elapsed ──────────────────────────────────────────────────────────────
 
 function getLiveElapsed(timer) {
   if (!timer.running) return timer.elapsed;
   return timer.elapsed + (Date.now() - timer.lastTick);
+}
+
+// ── Total time ────────────────────────────────────────────────────────────────
+
+function updateTotalTime() {
+  const total = timers.reduce((sum, t) => sum + getLiveElapsed(t), 0);
+  const totalMin = Math.floor(total / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const el = document.getElementById("totalTime");
+  if (el) el.textContent = h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// ── Tag filter bar ────────────────────────────────────────────────────────────
+
+function renderTagFilter() {
+  const allTags = [...new Set(timers.flatMap((t) => t.tags || []))].sort();
+  const bar = document.getElementById("tagFilter");
+  if (!bar) return;
+
+  if (allTags.length === 0) {
+    bar.style.display = "none";
+    return;
+  }
+
+  bar.style.display = "flex";
+  bar.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.className = "tag-filter-btn" + (activeTag === null ? " active" : "");
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    activeTag = null;
+    renderTagFilter();
+    renderTimers();
+  });
+  bar.appendChild(allBtn);
+
+  allTags.forEach((tag) => {
+    const btn = document.createElement("button");
+    btn.className =
+      "tag-filter-btn" + (activeTag === tag ? " active" : "");
+    btn.textContent = tag;
+    btn.addEventListener("click", () => {
+      activeTag = activeTag === tag ? null : tag;
+      renderTagFilter();
+      renderTimers();
+    });
+    bar.appendChild(btn);
+  });
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
@@ -136,35 +226,41 @@ function renderTimers() {
     list.innerHTML = "";
     list.appendChild(empty);
     empty.style.display = "block";
+    updateTotalTime();
+    renderTagFilter();
     return;
   }
 
   empty.style.display = "none";
 
-  // Build set of existing card ids
-  const existingIds = new Set(
-    [...list.querySelectorAll(".timer-card")].map((el) => el.dataset.id),
+  const search = searchQuery.toLowerCase();
+  const sorted = [...timers].sort(
+    (a, b) => (b.lastUsed || 0) - (a.lastUsed || 0),
   );
-  const newIds = new Set(timers.map((t) => t.id));
+  const filtered = sorted.filter((t) => {
+    if (search && !t.name.toLowerCase().includes(search)) return false;
+    if (activeTag && !(t.tags || []).includes(activeTag)) return false;
+    return true;
+  });
+  const filteredIds = new Set(filtered.map((t) => t.id));
 
-  // Remove deleted
-  existingIds.forEach((id) => {
-    if (!newIds.has(id)) {
-      const el = list.querySelector(`[data-id="${id}"]`);
-      if (el) el.remove();
-    }
+  // Remove cards that no longer pass the filter
+  [...list.querySelectorAll(".timer-card")].forEach((card) => {
+    if (!filteredIds.has(card.dataset.id)) card.remove();
   });
 
-  timers.forEach((timer, index) => {
+  // Create / update / reorder — appendChild moves existing nodes to maintain sort
+  filtered.forEach((timer) => {
     let card = list.querySelector(`[data-id="${timer.id}"]`);
-
     if (!card) {
       card = createTimerCard(timer);
-      list.appendChild(card);
     }
-
     updateTimerCard(card, timer);
+    list.appendChild(card);
   });
+
+  updateTotalTime();
+  renderTagFilter();
 }
 
 function createTimerCard(timer) {
@@ -177,10 +273,16 @@ function createTimerCard(timer) {
         <div class="status-dot"></div>
         <span class="timer-name" title="Click to rename">${escapeHtml(timer.name)}</span>
       </div>
-      <button class="delete-btn" data-action="delete" title="Delete timer">
-        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-      </button>
+      <div class="timer-top-right">
+        <button class="tag-add-btn" data-action="addtag" title="Add tag">
+          <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </button>
+        <button class="delete-btn" data-action="delete" title="Delete timer">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="timer-tags" data-tags style="display:none"></div>
     <div class="timer-display" title="Click to edit time">
       <span class="t-h editable">00</span><span class="sep">:</span><span class="t-m editable">00</span><span class="sep">:</span><span class="t-s">00</span>
     </div>
@@ -209,8 +311,7 @@ function createTimerCard(timer) {
   nameEl.addEventListener("click", () => startInlineNameEdit(card, timer.id));
 
   // Timer display click → time edit
-  const timerDisplayEditable = card.querySelectorAll(".editable");
-  timerDisplayEditable.forEach((el) => {
+  card.querySelectorAll(".editable").forEach((el) => {
     el.style.cursor = "pointer";
     el.addEventListener("click", (e) =>
       startTimeEdit(card, timer.id, e.target),
@@ -228,6 +329,7 @@ function createTimerCard(timer) {
     else if (action === "reset") resetTimer(id);
     else if (action === "delete") deleteTimer(id);
     else if (action === "copy") copyFractionalHours(id, btn);
+    else if (action === "addtag") startTagInput(card, id);
   });
 
   return card;
@@ -255,6 +357,90 @@ function updateTimerCard(card, timer) {
   // Update name if not editing
   const nameEl = card.querySelector(".timer-name");
   if (nameEl) nameEl.textContent = timer.name;
+
+  // Rebuild tags only when no input is active
+  const tagsEl = card.querySelector("[data-tags]");
+  if (tagsEl && !tagsEl.querySelector(".tag-input")) {
+    renderCardTags(tagsEl, timer);
+  }
+}
+
+function renderCardTags(tagsEl, timer) {
+  tagsEl.innerHTML = "";
+  const tags = timer.tags || [];
+
+  if (tags.length === 0) {
+    tagsEl.style.display = "none";
+    return;
+  }
+
+  tagsEl.style.display = "flex";
+  tags.forEach((tag) => {
+    const pill = document.createElement("span");
+    pill.className = "tag-pill";
+
+    const label = document.createElement("span");
+    label.textContent = tag;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "tag-remove";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      removeTag(timer.id, tag);
+    });
+
+    pill.appendChild(label);
+    pill.appendChild(removeBtn);
+    tagsEl.appendChild(pill);
+  });
+}
+
+function startTagInput(card, id) {
+  const tagsEl = card.querySelector("[data-tags]");
+  if (!tagsEl) return;
+
+  // Prevent double inputs
+  const existing = tagsEl.querySelector(".tag-input");
+  if (existing) {
+    existing.focus();
+    return;
+  }
+
+  tagsEl.style.display = "flex";
+
+  const input = document.createElement("input");
+  input.className = "tag-input";
+  input.placeholder = "tag...";
+  input.maxLength = 20;
+  tagsEl.appendChild(input);
+  input.focus();
+
+  let committed = false;
+  const finish = () => {
+    if (committed) return;
+    committed = true;
+    const val = input.value.trim();
+    if (val) {
+      addTag(id, val); // triggers re-render
+    } else {
+      // Re-render tags to hide row if still empty
+      const timer = timers.find((t) => t.id === id);
+      if (timer) renderCardTags(tagsEl, timer);
+    }
+  };
+
+  input.addEventListener("blur", finish);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === "Escape") {
+      input.value = "";
+      input.blur();
+    }
+  });
 }
 
 function startInlineNameEdit(card, id) {
@@ -322,7 +508,6 @@ function startTimeEdit(card, id, target) {
   const inputToFocus = target.classList.contains("t-h")
     ? hoursInput
     : minutesInput;
-
   inputToFocus.focus();
   inputToFocus.select();
 
@@ -360,7 +545,7 @@ function copyFractionalHours(id, btn) {
   const timer = timers.find((t) => t.id === id);
   if (!timer) return;
   const elapsed = getLiveElapsed(timer);
-  const fractional = (elapsed / 3600000).toFixed(1); // ms → hours, 1 decimal place
+  const fractional = (elapsed / 3600000).toFixed(1);
   navigator.clipboard.writeText(fractional).then(() => {
     // Flash feedback on button
     const original = btn.innerHTML;
@@ -387,16 +572,21 @@ function startDisplayLoop() {
   if (displayInterval) clearInterval(displayInterval);
   displayInterval = setInterval(() => {
     const list = document.getElementById("timerList");
+    let hasRunning = false;
     timers.forEach((timer) => {
-      const card = list.querySelector(`[data-id="${timer.id}"]`);
-      if (card && timer.running) {
-        const elapsed = getLiveElapsed(timer);
-        const { h, m, s } = formatTime(elapsed);
-        card.querySelector(".t-h").textContent = h;
-        card.querySelector(".t-m").textContent = m;
-        card.querySelector(".t-s").textContent = s;
+      if (timer.running) {
+        hasRunning = true;
+        const card = list.querySelector(`[data-id="${timer.id}"]`);
+        if (card) {
+          const elapsed = getLiveElapsed(timer);
+          const { h, m, s } = formatTime(elapsed);
+          card.querySelector(".t-h").textContent = h;
+          card.querySelector(".t-m").textContent = m;
+          card.querySelector(".t-s").textContent = s;
+        }
       }
     });
+    if (hasRunning) updateTotalTime();
   }, 100);
 }
 
@@ -408,21 +598,19 @@ function startStorageSync() {
       // Merge: update elapsed for running timers from storage, keep local for display
       fresh.forEach((ft) => {
         const idx = timers.findIndex((t) => t.id === ft.id);
-        if (idx !== -1) {
-          if (!timers[idx].running) {
-            timers[idx].elapsed = ft.elapsed;
-          }
+        if (idx !== -1 && !timers[idx].running) {
+          timers[idx].elapsed = ft.elapsed;
         }
       });
     });
   }, 2000);
 }
 
+// ── Event listeners ───────────────────────────────────────────────────────────
+
 document.getElementById("resetAllBtn").addEventListener("click", () => {
   timers.forEach((timer) => resetTimer(timer.id));
 });
-
-// ── New timer form ────────────────────────────────────────────────────────────
 
 document.getElementById("addBtn").addEventListener("click", () => {
   const form = document.getElementById("newTimerForm");
@@ -446,6 +634,11 @@ document.getElementById("confirmBtn").addEventListener("click", () => {
 document.getElementById("timerNameInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("confirmBtn").click();
   if (e.key === "Escape") document.getElementById("cancelBtn").click();
+});
+
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  searchQuery = e.target.value;
+  renderTimers();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
