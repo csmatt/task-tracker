@@ -70,6 +70,11 @@ function loadTimers(cb) {
 // ── Core timer actions ────────────────────────────────────────────────────────
 
 function startTimer(id) {
+  // clear search box
+  const searchInput = document.querySelector("#searchInput");
+  searchInput.value = "";
+  searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
   const now = Date.now();
   timers = timers.map((t) => {
     if (t.id === id) {
@@ -141,20 +146,28 @@ function updateTimerElapsed(id, hours, minutes) {
 }
 
 function addTimer(name) {
-  pushUndo();
   const now = Date.now();
-  const timer = {
-    id: generateId(),
-    name: name.trim() || "Timer",
-    elapsed: 0,
-    running: false,
-    lastTick: now,
-    lastUsed: now,
-    tags: [],
-  };
-  timers.unshift(timer);
+  const trimmedName = name.trim() || "Timer";
+  const existingTimer = timers.find((timer) => timer.name === trimmedName);
+  if (existingTimer) {
+    existingTimer.lastUsed = now;
+  } else {
+    pushUndo();
+
+    const timer = {
+      id: generateId(),
+      name: trimmedName,
+      elapsed: 0,
+      running: false,
+      lastTick: now,
+      lastUsed: now,
+      tags: [],
+    };
+    timers.unshift(timer);
+  }
   saveTimers();
   renderTimers();
+  cancelAddingNewTimer();
 }
 
 function addTag(id, tag) {
@@ -167,6 +180,7 @@ function addTag(id, tag) {
     }
     return t;
   });
+
   saveTimers();
   renderTimers();
 }
@@ -290,6 +304,7 @@ function renderTimers() {
     updateTimerCard(card, timer);
   });
 
+  list?.scrollTo(0, 0);
   updateTotalTime();
   renderTagFilter();
 }
@@ -385,7 +400,7 @@ function updateTimerCard(card, timer) {
   playBtn.style.opacity = isRunning ? "0.35" : "1";
   pauseBtn.style.opacity = !isRunning ? "0.35" : "1";
 
-  // Update name if not editing
+  // Update name if not editaddTing
   const nameEl = card.querySelector(".timer-name");
   if (nameEl) nameEl.textContent = timer.name;
 
@@ -452,6 +467,7 @@ function startTagInput(card, id) {
     if (committed) return;
     committed = true;
     const val = input.value.trim();
+    input.classList.remove("tag-input");
     if (val) {
       addTag(id, val); // triggers re-render
     } else {
@@ -653,10 +669,12 @@ document.getElementById("addBtn").addEventListener("click", () => {
   document.getElementById("timerNameInput").focus();
 });
 
-document.getElementById("cancelBtn").addEventListener("click", () => {
+function cancelAddingNewTimer() {
   document.getElementById("newTimerForm").classList.remove("visible");
   document.getElementById("timerNameInput").value = "";
-});
+}
+
+document.getElementById("cancelBtn").addEventListener("click", cancelAddingNewTimer);
 
 document.getElementById("confirmBtn").addEventListener("click", () => {
   const name =
